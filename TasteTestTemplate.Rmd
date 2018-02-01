@@ -1,0 +1,331 @@
+---
+title: "Butter Taste Test \n For Science!"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(plyr)
+library(ggplot2)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(psychometric)
+library(knitr)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+
+# read in the data
+setwd("~/TasteTests")
+source("summarySE.R")
+#raw_data<- readRDS("fakeData.Rds")
+#info<- readRDS("fakeInfo.Rds")
+raw_data<-read_csv("C:/Users/vessenes/Downloads/tastetest.csv")
+info <-read_csv("Butter Characteristics.csv")
+# rename the columns
+data <- raw_data %>% 
+  dplyr::rename(Taste=`Rate the taste (1 = low)`) %>%
+  dplyr::rename( Texture=`Rate the texture (1 = low)`) %>%
+  mutate(Overall=Taste+Texture) %>% 
+  dplyr::rename(ID=`Food ID`)
+# Join to the Brand infor
+data<- dplyr::left_join(data, info, by='ID')
+
+#price per ounce
+data$PricePerOz<-data$Price/data$Oz
+
+data$Brand<- as.factor(data$Brand)
+# and separate out the cow's milk data
+cow_data <- data %>% filter(Milk=='Cow')
+
+```
+## Objectives
+* Determine the best rated butter by overall (taste+ texture) mean rating
+* Determine the correlation in taste and texture ratings
+* Determine if milk type influences average rating
+* Determine if average ratings for cow's milk butters differ by:
+    + cultured vs non-cultured
+    + organic vs non-organic
+    + Grass Fed
+    + rBGH Free 
+* Determine the butter with the best price performance ratio  
+
+## Methodology
+This is a triple-blinded taste test of butters.  Neither the tasters, the study conductor, nor the statistician knew the identity of the butters. 
+
+
+### Measurements
+Tasters rated butter butter for taste and texure (mouth feel) on a five point rating system, from 1 (low) to 5 (high). The sum of these ratings consitutes the total rating for the butter. No attempt was maded to standaradize or validate inter or intra taster ratings.  Tasters were allowed to rate a butter multiple times and skip rating butters.  All values are self reported. 
+
+## 
+
+### Process
+All butters were presented simulaneously on individual marked plates. Tasters were given a survey link, where they would select the butter label, taste rating, and texture rating. They could optionally enter a personal identifier (should they wish to filter their personal responses from the data) and any comments.  Personal identifiers were not required, assigned, nor collected as part of the study.
+
+
+## Materials 
+
+### Butter Selection
+Butters were purchased at local shops in the Davis-Porter-FreshPond area of Camberville. No attempt was made to price compare and store discounts were not included in the price analysis.  To qualify for the study butters must have been available for purchase when the store was visted the week prior to the study.  Only salted, non-whipped, non-flavored butters were considered.  Non-cow milk butters were allowed, but non-dairy butters were not.
+
+Butters were refridgerated until the day of the study.  They were set out to warm up one hour before the starting time of the study.  Butters were cut into irregular rectangular shapes to hide identifing packaging features. Butter features were recorded based off easily observable data on packaging.
+
+##
+
+### Accompaniments
+A wide selection of butter accompaniments, including chocolate banana muffins and a variety of breads were provided. Tasters were encouraged to bring their favorite butter coaster for consumption.  No attempt was made to restrict, standardize, or control how the taster consumed the butter.  A variety a beverages, including water, were provided to cleanse the palette between samples, but was left to the tasters discretion. Tasting was done in a large, social group, so outside influence (social pressure) may exist.
+
+## Participants 
+Participants were a non-random sample of friends who could consume butter and were available durning the study date (April 23, 2017 @ 10:30am ).  The majority of participants were white, highly educated, well-off, cisgender adults living in the Camberville area, mainly affiliated with the tech industry. Many would identify as foodies.  
+
+Participants were informed verbally and in writing about this study, but acknolwedgement signatures were not obtained. They could choose not to participate or drop out at any time by not submitting surveys.  However, once submitted, they could not revoke submissions. There are no known hazards to this study other than what is natuarally assumed by consuming butter. No IRB approval was sought for this experiment. 
+
+## Reproducibility
+The dataset, code, and presentation are all available upon request to drvessenes@gmail.com.  The survey was conducted through Google Forms and the analysis was done in R through R studio.  Presentation was made via Rmarkdown and graphics via ggplot2.
+
+## Statistical Analysis
+The data analysis in this report was determined and coded prior to the experiment. This means that no p-hacking was involved, but additional analysis may yield further insights. 
+
+When provide, 95% normal confidence intervals are used, with no adjustment for bounded intervals. Unpaired,independent, two-sample, two-sided t-test on means with pooled variance was used to make comparisons.  No adjustments for multiple comparisions were made to p-values.
+
+## Disclosures
+I (Rebecca Vessenes) ran the testing, conducted the analysis, and participated in rating the butters, however someone else blinded the samples. I have no personal or finacial affiliation with any butter company. (Though some of my relatives are dairy farmers.)  I did, however, make one of the sample butters. 
+
+This study was funded by the Ted and Rebecca Food with Friends Fund.
+
+## Data Overview
+```{r, warning=FALSE, echo=FALSE}
+tall_data<- data%>% 
+  dplyr::select(
+    one_of('Brand', 'Taste', 'Texture', 'Cultured')) %>%
+  tidyr::gather(key=Metric,
+                value=Rating, 
+                -Brand, -Cultured )
+
+
+ggplot(tall_data)+geom_boxplot(aes(x=Metric, y=Rating))+facet_wrap(~Brand)+
+  theme(axis.title.x = element_blank(),
+           axis.text.x  = element_text(angle=90, vjust=0.5))
+
+```
+
+
+## Best Butter Overall
+By mean Overall (Taste + Texture) Rating
+
+```{r, warning=FALSE, echo=FALSE}
+
+# 
+# summarize the data with confidence intervals
+
+data_summary_taste<- summarySE(data,
+                               measurevar = "Taste",
+                               groupvars = c("Brand", "Cultured"))
+
+data_summary_texture<- summarySE(data,
+                                 measurevar = "Texture",
+                               groupvars = c("Brand"))
+
+data_summary_overall<- summarySE(data,
+                                 measurevar = "Overall",
+                               groupvars = c("Brand",
+                                             "Cultured"))
+
+
+rank_order<- data_summary_overall$Brand[order(data_summary_overall$Overall)]
+
+ggplot(data_summary_overall, 
+       aes(x=Brand, y=Overall, fill=Cultured)) + 
+    geom_bar( stat="identity") +
+    geom_errorbar(aes(ymin=Overall-ci, ymax=Overall+ci),
+                  width=.2)+
+  scale_x_discrete(limits=rank_order)+
+  coord_flip()+
+  theme(legend.position = 'top')
+
+# data_median<-data %>% dplyr::group_by(Brand) %>% 
+#   summarise_at(vars(Taste,Texture,Overall),  median)
+
+```
+
+## Taste & Texture Correlations
+For all ratings, the correlation between taste and texture is `r round(cor(data$Taste, data$Texture),2)`, 
+[`r round(CIr(r=cor(data$Taste, data$Texture), n=length(data), level=.95),2)
+`]
+```{r, warning=FALSE, echo=FALSE}
+ggplot(data,aes(x=Taste, y=Texture))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  facet_wrap(~Brand)
+```
+
+## Milk Type
+Comparison of Taste ratings for Cow, Buffalo, and Goat milk butters.
+
+```{r, warning=FALSE, echo=FALSE}
+ggplot(data, aes(x=Milk, y=Taste))+geom_boxplot()+labs(title="Taste Rating by Milk Type")
+```
+
+##
+_Cow versus Buffalo_
+```{r, warning=FALSE, echo=FALSE}
+cow<-data$Taste[data$Milk=='Cow']
+buffalo<-data$Taste[data$Milk=='Buffalo']
+goat<-data$Taste[data$Milk=='Goat']
+
+print(t.test(cow,buffalo,
+       alternative="two.sided"))
+
+```
+##
+_Cow Versus Goat_
+```{r, warning=FALSE, echo=FALSE}
+
+print(t.test(cow,goat,
+       alternative="two.sided"))
+
+
+```
+
+## Cultured Cow Milk Butter Taste Preference
+```{r, warning=FALSE,echo=FALSE}
+ggplot(cow_data, aes(x=Cultured, y=Taste))+geom_boxplot()+labs(title="Taste Rating by Cultured Label")
+
+cultured <-cow_data %>%filter(Cultured=="Yes") %>% .$Taste
+non_cultured <- cow_data %>% filter(Cultured=="No") %>% .$Taste
+```
+
+## Cultured Signficance
+```{r}
+print(t.test(non_cultured, cultured, alternative="two.sided"))
+
+```
+
+## Organic Effect on Taste of Cow Milk Butter
+```{r, warning=FALSE,echo=FALSE}
+ggplot(cow_data, aes(x=Organic, y=Taste))+geom_boxplot()+labs(title="Taste Rating by Organic Label")
+
+organic <-cow_data %>%filter(Organic=="Yes") %>% .$Taste
+non_organic <- cow_data %>% filter(Organic=="No") %>% .$Taste
+
+```
+
+## Organic Significance
+```{r, echo=FALSE}
+print(t.test(non_organic, organic, alternative="two.sided"))
+
+```
+
+## Grass Fed Status on Cow's Milk Taste
+```{r, warning=FALSE,echo=FALSE}
+ggplot(cow_data, aes(x=GrassFed, y=Taste))+geom_boxplot()+labs(title="Taste Rating by Grass Fed Label")
+
+grass <-cow_data %>%filter(GrassFed=="Yes") %>% .$Taste
+non_grass <- cow_data %>% filter(GrassFed=="No") %>% .$Taste
+t.test(non_grass, grass, alternative="two.sided")
+
+```
+
+## Grass Fed Significance
+```{r, echo=FALSE}
+print(t.test(non_grass, grass, alternative="two.sided")
+)
+```
+
+
+## rBGH and Taste of Cow's Milk Butter
+```{r, warning=FALSE,echo=FALSE}
+ggplot(cow_data, aes(x=HormoneFree, y=Taste))+geom_boxplot()+labs(title="Taste Rating by Hormone Free Label")
+
+hormonefree <-cow_data %>%filter(HormoneFree=="Yes") %>% .$Taste
+non_hormonefree <- cow_data %>% filter(HormoneFree=="No") %>% .$Taste
+
+```
+
+## Hormone Free Significance
+```{r, echo=FALSE}
+t.test(non_hormonefree,hormonefree, alternative="two.sided")
+
+```
+
+
+## Price Performance
+The price performance is determined by price per ounce (in USD) divided by the overall rating (cost per rating point).   So a low value indicates a better butter value. 
+
+```{r, warning=FALSE, echo=FALSE}
+data$PricePerformance<- data$PricePerOz/data$Overall
+data_summary_price<- 
+  summarySE(data,
+            measurevar = "PricePerformance",
+                               groupvars = c("Brand",
+                                             "Cultured"))
+
+
+rank_order<- data_summary_price$Brand[
+  order(data_summary_price$PricePerformance)]
+
+ggplot(data_summary_price, 
+       aes(x=Brand, y=PricePerformance, fill=Cultured)) + 
+    geom_bar( stat="identity") +
+    geom_errorbar(aes(ymin=PricePerformance-ci,
+                      ymax=PricePerformance+ci),
+                  width=.2)+
+  scale_x_discrete(limits=rank_order)+
+  coord_flip()+
+  theme(legend.position = 'top')
+
+
+```
+
+## General Butter Info
+```{r, warning=FALSE, echo=FALSE}
+info$PricePerOz<- info$Price/info$Oz
+info_overall <- info %>%
+  dplyr::select(one_of('ID', 'Brand', 'Milk', 'Cultured', 'Organic', 'GrassFed','HormoneFree', 'PricePerOz'))
+info_overall_metrics<- info_overall %>%left_join(
+  dplyr::select(data_summary_overall, 
+         one_of('Brand', 'N', 'Overall')), by="Brand") %>%
+    left_join(
+      dplyr::select(data_summary_taste,
+             one_of('Brand', 'Taste')), by="Brand") %>%
+  left_join(
+    dplyr::select(data_summary_texture,
+           one_of('Brand', 'Texture')), by="Brand") %>%
+  left_join(
+    dplyr::select(data_summary_price,
+           one_of('Brand', 'PricePerformance')),
+    by="Brand")%>%
+  dplyr::select(one_of(
+  "ID", "Brand", "Taste", "Texture", "Overall",
+  "PricePerformance", "PricePerOz"
+))
+```  
+        
+```{r, echo=FALSE}
+kable(info_overall, pad=0,digits=2)
+```
+
+## Summary Rating 
+```{r, echo=FALSE}
+kable(info_overall_metrics, digits=2)
+```
+
+
+
+## References
+* https://www.r-bloggers.com/building-wordclouds-in-r/
+* http://www.cookbook-r.com/Manipulating_data/Summarizing_data/
+* Rstudio
+* library(plyr)
+* library(ggplot2)
+* library(readr)
+* library(tidyr)
+* library(dplyr)
+* library(psychometric)
+* library(knitr)
+* library(tm)
+* library(SnowballC)
+* library(wordcloud)
